@@ -1,0 +1,5 @@
+python: &pythonbase
+  build: .
+  entrypoint: ["python"]
+  volumes:
+    - ".:/code"
