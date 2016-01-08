@@ -1,5 +1,6 @@
 import warnings
 import asyncio
+import threading
 
 import logging
 log = logging.getLogger(__name__)
@@ -19,6 +20,9 @@ libportmidi-dev
 SINGLE_SOUND_AT_SAME_TIME = True
 
 QUEUE = asyncio.Queue()
+# mido uses callbacks AND threading so we cannot purely use asyncio
+# and need to use an event to wake up the QUEUE
+STUFF_IN_QUEUE = threading.Event()
 
 FIRST_KEY = 36
 NUMBER_KEYS = 61
@@ -47,17 +51,18 @@ def process_keystroke(message):
     filename = KEY_MAPPING.get(key)
     if filename:
         QUEUE.put_nowait(filename)
+        STUFF_IN_QUEUE.set()
         log.debug("enqueued %d | %s" % (QUEUE.qsize(), filename))
     else:
         log.debug("No file mapped for this key: %d" % key)
 
-
 async def consume():
-    log.debug("begin consume")
-    while QUEUE.empty():
-        await asyncio.sleep(.1)
+    STUFF_IN_QUEUE.wait()
     filename = await QUEUE.get()
-    log.debug("pending  %d | %s" % (QUEUE.qsize(), filename))
+    pendings = QUEUE.qsize()
+    if not pendings:
+        STUFF_IN_QUEUE.clear()
+    log.debug("pending  %d | %s" % (pendings, filename))
     _exec = " ".join(["mpv -really-quiet", FILE_LOCATION.format(filename), ])
     process = await asyncio.create_subprocess_shell(_exec)
     if SINGLE_SOUND_AT_SAME_TIME:
