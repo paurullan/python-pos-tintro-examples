@@ -51,11 +51,11 @@ def process_keystroke(message):
     else:
         log.debug("No file mapped for this key: %d" % key)
 
-async def infinite_append():
-    while True:
-        await asyncio.sleep(.1)
 
 async def consume():
+    log.debug("begin consume")
+    while QUEUE.empty():
+        await asyncio.sleep(.1)
     filename = await QUEUE.get()
     log.debug("pending  %d | %s" % (QUEUE.qsize(), filename))
     _exec = " ".join(["mpv -really-quiet", FILE_LOCATION.format(filename), ])
@@ -79,9 +79,5 @@ inport.callback = process_keystroke
 
 
 loop = asyncio.get_event_loop()
-tasks = [
-    asyncio.Task(infinite_append()),
-    asyncio.Task(consumer()),
-]
-loop.run_until_complete(asyncio.wait(tasks))
-loop.close()
+loop.create_task(consumer())
+loop.run_forever()
