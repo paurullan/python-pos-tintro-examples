@@ -3,7 +3,7 @@ import asyncio
 
 import logging
 log = logging.getLogger(__name__)
-
+logging.basicConfig(level=logging.DEBUG)
 
 import mido
 
@@ -30,13 +30,13 @@ FILE_LOCATION="/home/paurullan/Dropbox/sons-apm/ogg/{}.ogg"
 
 with open(FILENAME) as f:
     for key, filename in enumerate(f.readlines(), FIRST_KEY):
-        KEY_MAPPING[key] = FILE_LOCATION.format(filename.strip())
+        KEY_MAPPING[key] = filename.strip()
 
 if len(KEY_MAPPING) > NUMBER_KEYS:
     warnings.warn("There are more files than notes;"
                   " many files will not be accesible")
 else:
-    print("Loaded sounds: %d" % len(KEY_MAPPING))
+    log.debug("Loaded sounds: %d" % len(KEY_MAPPING))
 
 def process_keystroke(message):
     if message.type != 'note_on':
@@ -47,9 +47,25 @@ def process_keystroke(message):
     filename = KEY_MAPPING.get(key)
     if filename:
         QUEUE.put_nowait(filename)
-        log.warning("Queued number %d with file %s" % (QUEUE.qsize(), filename))
+        log.debug("enqueued %d | %s" % (QUEUE.qsize(), filename))
     else:
-        log.error("No file mapped for this key: %d" % key)
+        log.debug("No file mapped for this key: %d" % key)
+
+async def infinite_append():
+    while True:
+        await asyncio.sleep(.1)
+
+async def consume():
+    filename = await QUEUE.get()
+    log.debug("pending  %d | %s" % (QUEUE.qsize(), filename))
+    _exec = " ".join(["mpv -really-quiet", FILE_LOCATION.format(filename), ])
+    process = await asyncio.create_subprocess_shell(_exec)
+    if SINGLE_SOUND_AT_SAME_TIME:
+        await process.wait()
+
+async def consumer():
+    while True:
+        await consume()
 
 
 # http://mido.readthedocs.org/en/latest/ports.html
@@ -61,24 +77,6 @@ name = midi_names[0]
 inport = mido.open_input(name)
 inport.callback = process_keystroke
 
-
-async def infinite_append():
-    while True:
-        await asyncio.sleep(.1)
-        #print("ola")
-
-async def consume():
-    filename = await QUEUE.get()
-    print(QUEUE.qsize())
-    print("Recollit: {}".format(filename))
-    _exec = " ".join(["mpv -really-quiet", filename, ])
-    process = await asyncio.create_subprocess_shell(_exec)
-    if SINGLE_SOUND_AT_SAME_TIME:
-        await process.wait()
-
-async def consumer():
-    while True:
-        await consume()
 
 loop = asyncio.get_event_loop()
 tasks = [
