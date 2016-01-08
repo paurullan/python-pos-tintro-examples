@@ -16,9 +16,6 @@ Install extra
 libportmidi-dev
 """
 
-# Config if you just want to enqueue the sounds or play them at the same time
-SINGLE_SOUND_AT_SAME_TIME = True
-
 QUEUE = asyncio.Queue()
 # mido uses callbacks AND threading so we cannot purely use asyncio
 # and need to use an event to wake up the QUEUE
@@ -65,8 +62,7 @@ async def consume():
     log.debug("pending  %d | %s" % (pendings, filename))
     _exec = " ".join(["mpv -really-quiet", FILE_LOCATION.format(filename), ])
     process = await asyncio.create_subprocess_shell(_exec)
-    if SINGLE_SOUND_AT_SAME_TIME:
-        await process.wait()
+    await process.wait()
 
 async def consumer():
     while True:
